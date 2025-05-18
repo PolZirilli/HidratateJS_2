@@ -39,10 +39,10 @@ function renderizarRegistros() {
           }
         </td>
         <td>
-          <button class="btn btn-sm btn-link text-primary" onclick="toggleEditarRegistro('agua', ${index})">
+          <button class="btn btn-sm btn-link text-primary" onclick="toggleEditarRegistro('agua', ${index})" title="${esEditando ? 'Guardar' : 'Editar'}">
             <i class="fas fa-${esEditando ? 'check' : 'edit'}"></i>
           </button>
-          <button class="btn btn-sm btn-link text-danger" onclick="eliminarRegistro('agua', ${index})">
+          <button class="btn btn-sm btn-link text-danger" onclick="eliminarRegistro('agua', ${index})" title="Eliminar">
             <i class="fas fa-trash"></i>
           </button>
         </td>
@@ -63,10 +63,10 @@ function renderizarRegistros() {
           }
         </td>
         <td>
-          <button class="btn btn-sm btn-link text-primary" onclick="toggleEditarRegistro('orina', ${index})">
+          <button class="btn btn-sm btn-link text-primary" onclick="toggleEditarRegistro('orina', ${index})" title="${esEditando ? 'Guardar' : 'Editar'}">
             <i class="fas fa-${esEditando ? 'check' : 'edit'}"></i>
           </button>
-          <button class="btn btn-sm btn-link text-danger" onclick="eliminarRegistro('orina', ${index})">
+          <button class="btn btn-sm btn-link text-danger" onclick="eliminarRegistro('orina', ${index})" title="Eliminar">
             <i class="fas fa-trash"></i>
           </button>
         </td>
@@ -80,32 +80,53 @@ function renderizarRegistros() {
 // Guardar un registro nuevo
 function guardarRegistro(tipo) {
   const mlInput = document.getElementById('ml');
+  if (!mlInput) {
+    console.error("No se encontró el input de ml");
+    return;
+  }
+
   const cantidad = mlInput.value.trim();
-  if (!cantidad || cantidad <= 0) return;
+  if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
+    mostrarModal("Ingrese un valor numérico válido mayor que cero.");
+    mlInput.focus();
+    return;
+  }
 
   const now = new Date();
   const registro = {
     fecha: now.toLocaleDateString(),
     hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    ml: cantidad
+    ml: Number(cantidad)
   };
 
   if (tipo === 'agua') registrosAgua.push(registro);
-  else registrosOrina.push(registro);
+  else if (tipo === 'orina') registrosOrina.push(registro);
+  else {
+    console.error("Tipo de registro desconocido:", tipo);
+    return;
+  }
 
   mlInput.value = '';
-  registroEditando = { tipo: null, index: null }; // Reset edición
+  registroEditando = { tipo: null, index: null };
   renderizarRegistros();
   mostrarModal("Registro guardado correctamente.");
 
-  // Guardar en Firestore
-  guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+  // Guardar en Firestore solo si está definida
+  if (typeof guardarRegistrosEnFirestore === "function") {
+    guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+  } else {
+    console.warn("guardarRegistrosEnFirestore no está definida.");
+  }
 }
 
 // Eliminar registro
 function eliminarRegistro(tipo, index) {
   if (tipo === 'agua') registrosAgua.splice(index, 1);
-  else registrosOrina.splice(index, 1);
+  else if (tipo === 'orina') registrosOrina.splice(index, 1);
+  else {
+    console.error("Tipo de registro desconocido para eliminar:", tipo);
+    return;
+  }
 
   // Ajustar estado de edición si afecta
   if (registroEditando.tipo === tipo && registroEditando.index === index) {
@@ -116,15 +137,18 @@ function eliminarRegistro(tipo, index) {
 
   renderizarRegistros();
 
-  // Guardar en Firestore
-  guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+  if (typeof guardarRegistrosEnFirestore === "function") {
+    guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+  } else {
+    console.warn("guardarRegistrosEnFirestore no está definida.");
+  }
 }
 
 // Alternar edición de registro
 function toggleEditarRegistro(tipo, index) {
   // Evitar editar más de uno a la vez
   if (registroEditando.tipo !== null && (registroEditando.tipo !== tipo || registroEditando.index !== index)) {
-    alert("Termine de editar el registro actual antes de editar otro.");
+    mostrarModal("Termine de editar el registro actual antes de editar otro.");
     return;
   }
 
@@ -134,25 +158,29 @@ function toggleEditarRegistro(tipo, index) {
     // Guardar cambios
     let inputId = tipo === 'agua' ? `inputAgua${index}` : `inputOrina${index}`;
     const inputElem = document.getElementById(inputId);
+    if (!inputElem) {
+      console.error("No se encontró el input para editar:", inputId);
+      return;
+    }
     const nuevoValor = inputElem.value.trim();
 
-    if (!nuevoValor || nuevoValor <= 0) {
-      alert("Ingrese un valor válido mayor que cero.");
+    if (!nuevoValor || isNaN(nuevoValor) || nuevoValor <= 0) {
+      mostrarModal("Ingrese un valor numérico válido mayor que cero.");
       inputElem.focus();
       return;
     }
 
-    if (tipo === 'agua') {
-      registrosAgua[index].ml = nuevoValor;
-    } else {
-      registrosOrina[index].ml = nuevoValor;
-    }
+    if (tipo === 'agua') registrosAgua[index].ml = Number(nuevoValor);
+    else registrosOrina[index].ml = Number(nuevoValor);
 
     registroEditando = { tipo: null, index: null };
     renderizarRegistros();
 
-    // Guardar en Firestore
-    guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+    if (typeof guardarRegistrosEnFirestore === "function") {
+      guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+    } else {
+      console.warn("guardarRegistrosEnFirestore no está definida.");
+    }
 
   } else {
     // Activar modo edición
@@ -168,17 +196,14 @@ function toggleEditarRegistro(tipo, index) {
   }
 }
 
-// ------------------ Integración con Firebase ------------------
-
-// Las funciones guardarRegistrosEnFirestore y cargarRegistros
-// se importan desde firebase.js y se usan aquí
-
-// Carga inicial al iniciar sesión
+// Inicializar y cargar datos
 function inicializar() {
   if (typeof cargarRegistros === 'function') {
     cargarRegistros();
+  } else {
+    console.warn("Función cargarRegistros no está definida.");
   }
 }
 
 // Ejecutar la inicialización
-inicializar();
+window.addEventListener('load', inicializar);

@@ -1,11 +1,9 @@
 // firebase.js
 
-// Importa solo si usas módulos (si no, usa los scripts CDN en HTML)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// Tu configuración de Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyCZwSmxDytJUAXZ3GtKNqtWK4GElsjtBWk",
     authDomain: "hidratatejs.firebaseapp.com",
@@ -16,14 +14,12 @@ const firebaseConfig = {
     measurementId: "G-6E22M5Z4T1"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null;
 
-// Escuchar el estado de autenticación
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser = user;
@@ -32,11 +28,9 @@ onAuthStateChanged(auth, (user) => {
   } else {
     currentUser = null;
     console.log("Usuario no logueado");
-    // Aquí podrías limpiar o mostrar que no hay datos cargados
   }
 });
 
-// Función para cargar registros del usuario actual desde Firestore
 async function cargarRegistros() {
   if (!currentUser) return;
 
@@ -45,13 +39,9 @@ async function cargarRegistros() {
 
   if (docSnap.exists()) {
     const data = docSnap.data();
-
-    // Actualizamos las variables globales del app.js
-    // Asumiendo que están en el scope global, si no hay que ajustar export/import
     window.registrosAgua = data.registrosAgua || [];
     window.registrosOrina = data.registrosOrina || [];
 
-    // Actualizar UI con los datos cargados
     if (typeof window.renderizarRegistros === "function") {
       window.renderizarRegistros();
     }
@@ -65,7 +55,6 @@ async function cargarRegistros() {
   }
 }
 
-// Función para guardar registros en Firestore para el usuario actual
 async function guardarRegistrosEnFirestore(registrosAgua, registrosOrina) {
   if (!currentUser) return;
 
@@ -81,3 +70,6 @@ async function guardarRegistrosEnFirestore(registrosAgua, registrosOrina) {
     console.error("Error al guardar en Firestore:", error);
   }
 }
+
+// Exponer función global para que app.js pueda usarla
+window.guardarRegistrosEnFirestore = guardarRegistrosEnFirestore;
