@@ -1,13 +1,18 @@
+// app.js
+
+// Variables globales
 let registrosAgua = [];
 let registrosOrina = [];
 
 // Para controlar qué fila está en modo edición (tipo, índice)
 let registroEditando = { tipo: null, index: null };
 
+// Mostrar alerta modal
 function mostrarModal(mensaje) {
   alert(mensaje);
 }
 
+// Actualiza totales en la UI
 function actualizarTotales() {
   const totalAgua = registrosAgua.reduce((acc, reg) => acc + Number(reg.ml), 0);
   const totalOrina = registrosOrina.reduce((acc, reg) => acc + Number(reg.ml), 0);
@@ -16,6 +21,7 @@ function actualizarTotales() {
   document.getElementById('totalOrina').textContent = totalOrina;
 }
 
+// Renderiza tablas con registros, incluye inputs para edición
 function renderizarRegistros() {
   const tablaAgua = document.getElementById('tablaAgua');
   const tablaOrina = document.getElementById('tablaOrina');
@@ -71,6 +77,7 @@ function renderizarRegistros() {
   actualizarTotales();
 }
 
+// Guardar un registro nuevo
 function guardarRegistro(tipo) {
   const mlInput = document.getElementById('ml');
   const cantidad = mlInput.value.trim();
@@ -90,25 +97,32 @@ function guardarRegistro(tipo) {
   registroEditando = { tipo: null, index: null }; // Reset edición
   renderizarRegistros();
   mostrarModal("Registro guardado correctamente.");
+
+  // Guardar en Firestore
+  guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
 }
 
+// Eliminar registro
 function eliminarRegistro(tipo, index) {
   if (tipo === 'agua') registrosAgua.splice(index, 1);
   else registrosOrina.splice(index, 1);
 
-  // Si estaba editando este registro, cancelar edición
+  // Ajustar estado de edición si afecta
   if (registroEditando.tipo === tipo && registroEditando.index === index) {
     registroEditando = { tipo: null, index: null };
   } else if (registroEditando.tipo === tipo && registroEditando.index > index) {
-    // Ajustar índice si eliminamos antes del editado
     registroEditando.index--;
   }
 
   renderizarRegistros();
+
+  // Guardar en Firestore
+  guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
 }
 
+// Alternar edición de registro
 function toggleEditarRegistro(tipo, index) {
-  // Si estamos editando otra fila diferente, confirmamos guardar o cancelar edición actual
+  // Evitar editar más de uno a la vez
   if (registroEditando.tipo !== null && (registroEditando.tipo !== tipo || registroEditando.index !== index)) {
     alert("Termine de editar el registro actual antes de editar otro.");
     return;
@@ -136,11 +150,16 @@ function toggleEditarRegistro(tipo, index) {
 
     registroEditando = { tipo: null, index: null };
     renderizarRegistros();
+
+    // Guardar en Firestore
+    guardarRegistrosEnFirestore(registrosAgua, registrosOrina);
+
   } else {
     // Activar modo edición
     registroEditando = { tipo, index };
     renderizarRegistros();
-    // Poner foco en input luego de render
+
+    // Poner foco en input después de render
     setTimeout(() => {
       const inputId = tipo === 'agua' ? `inputAgua${index}` : `inputOrina${index}`;
       const inputElem = document.getElementById(inputId);
@@ -149,5 +168,17 @@ function toggleEditarRegistro(tipo, index) {
   }
 }
 
-// Inicializar render
-renderizarRegistros();
+// ------------------ Integración con Firebase ------------------
+
+// Las funciones guardarRegistrosEnFirestore y cargarRegistros
+// se importan desde firebase.js y se usan aquí
+
+// Carga inicial al iniciar sesión
+function inicializar() {
+  if (typeof cargarRegistros === 'function') {
+    cargarRegistros();
+  }
+}
+
+// Ejecutar la inicialización
+inicializar();
